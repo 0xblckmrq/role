@@ -13,10 +13,13 @@ if (!token) throw new Error("BOT_TOKEN not set");
 
 const client = new Client({
   intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
+    GatewayIntentBits.Guilds,             // Required for server info
+    GatewayIntentBits.GuildMessages,      // Required to read messages in channels
+    GatewayIntentBits.MessageContent,     // **CRITICAL: lets bot read message text**
+    GatewayIntentBits.GuildMembers        // Required to assign roles
+  ]
+});
+
   ]
 });
 
