@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits } = require("discord.js");
 const express = require("express");
 const { ethers } = require("ethers");
+const path = require("path");
 
 // ===== CONFIG =====
 const ROLE_NAME = "Human ID Verified"; 
@@ -13,7 +14,7 @@ if (!token) {
   process.exit(1);
 }
 
-// Discord client with correct intents
+// ===== Discord Client =====
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -23,24 +24,27 @@ const client = new Client({
   ]
 });
 
-// Express ping server
+// ===== Express Server =====
 const app = express();
+app.use(express.static(path.join(__dirname, "public"))); // serve signer.html
 app.get("/", (req, res) => res.send("SBT bot is alive"));
 app.listen(3000, () => console.log("API running on port 3000"));
 
-// Store challenges
+// ===== Challenge storage =====
 const challenges = new Map();
 
-// Optimism provider
+// ===== Optimism provider =====
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const ABI = ["function balanceOf(address owner) view returns (uint256)"];
 
+// ===== Bot Ready =====
 client.once("ready", () => console.log(`Logged in as ${client.user.tag}`));
 
+// ===== Message Handler =====
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-  // Start verification
+  // ---- Step 1: Start verification ----
   if (message.content === "!verify") {
     const challenge = `Verify Discord ${message.author.id}-${Date.now()}`;
     challenges.set(message.author.id, challenge);
@@ -48,11 +52,12 @@ client.on("messageCreate", async (message) => {
     return message.reply(
       `✅ **Wallet Verification Started**\n\n` +
       `Sign this message with your wallet:\n\`${challenge}\`\n\n` +
+      `Or use the signer page: https://role-tfws.onrender.com/signer.html?msg=${encodeURIComponent(challenge)}\n\n` +
       `Then reply with:\n!signature <your_signature>`
     );
   }
 
-  // Signature submission
+  // ---- Step 2: Signature submission ----
   if (message.content.startsWith("!signature")) {
     const args = message.content.split(" ");
     if (!args[1]) return message.reply("Send: `!signature <signature>`");
@@ -68,6 +73,7 @@ client.on("messageCreate", async (message) => {
       return message.reply("❌ Invalid signature.");
     }
 
+    // ---- Check SBT ownership ----
     try {
       const contract = new ethers.Contract(SBT_CONTRACT, ABI, provider);
       const balance = await contract.balanceOf(wallet);
@@ -90,4 +96,5 @@ client.on("messageCreate", async (message) => {
   }
 });
 
+// ===== Login =====
 client.login(token);
