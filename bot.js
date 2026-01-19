@@ -3,10 +3,9 @@ const express = require("express");
 const { ethers } = require("ethers");
 
 // ===== CONFIG =====
-const ROLE_NAME = "Human ID Verified"; // Change if needed
+const ROLE_NAME = "Human ID Verified"; 
 const SBT_CONTRACT = "0x2AA822e264F8cc31A2b9C22f39e5551241e94DfB";
 const RPC_URL = "https://mainnet.optimism.io";
-// ==================
 
 const token = process.env.BOT_TOKEN;
 if (!token) {
@@ -14,36 +13,34 @@ if (!token) {
   process.exit(1);
 }
 
-// ===== Discord Client with correct intents =====
+// Discord client with correct intents
 const client = new Client({
   intents: [
-    GatewayIntentBits.Guilds,             // server info
-    GatewayIntentBits.GuildMessages,      // messages
-    GatewayIntentBits.MessageContent,     // read message content
-    GatewayIntentBits.GuildMembers        // assign roles
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers
   ]
 });
 
-// ===== Express ping server for Render =====
+// Express ping server
 const app = express();
 app.get("/", (req, res) => res.send("SBT bot is alive"));
 app.listen(3000, () => console.log("API running on port 3000"));
 
-// ===== Challenge storage =====
+// Store challenges
 const challenges = new Map();
 
-// ===== Optimism provider =====
+// Optimism provider
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const ABI = ["function balanceOf(address owner) view returns (uint256)"];
 
-// ===== Bot ready =====
 client.once("ready", () => console.log(`Logged in as ${client.user.tag}`));
 
-// ===== Message handler =====
 client.on("messageCreate", async (message) => {
-  if (message.author.bot) return; // ignore bots
+  if (message.author.bot) return;
 
-  // ---- Step 1: start verification ----
+  // Start verification
   if (message.content === "!verify") {
     const challenge = `Verify Discord ${message.author.id}-${Date.now()}`;
     challenges.set(message.author.id, challenge);
@@ -51,28 +48,26 @@ client.on("messageCreate", async (message) => {
     return message.reply(
       `✅ **Wallet Verification Started**\n\n` +
       `Sign this message with your wallet:\n\`${challenge}\`\n\n` +
-      `Then reply with:\n` +
-      `!signature <your_signature>`
+      `Then reply with:\n!signature <your_signature>`
     );
   }
 
-  // ---- Step 2: signature submission ----
+  // Signature submission
   if (message.content.startsWith("!signature")) {
     const args = message.content.split(" ");
     if (!args[1]) return message.reply("Send: `!signature <signature>`");
 
     const signature = args[1];
     const challenge = challenges.get(message.author.id);
-    if (!challenge) return message.reply("Run `!verify` first.");
+    if (!challenge) return message.reply("Run !verify first.");
 
     let wallet;
     try {
-      wallet = ethers.verifyMessage(challenge, signature); // ethers v6
+      wallet = ethers.verifyMessage(challenge, signature);
     } catch (err) {
       return message.reply("❌ Invalid signature.");
     }
 
-    // ---- Check SBT balance ----
     try {
       const contract = new ethers.Contract(SBT_CONTRACT, ABI, provider);
       const balance = await contract.balanceOf(wallet);
@@ -95,5 +90,4 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-// ===== Login =====
 client.login(token);
