@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign Message</title>
+</head>
+<body>
+<h2>Sign Your Bot Message</h2>
+<input type="text" id="msg" placeholder="Paste challenge here" size="80">
+<button onclick="sign()">Sign Message</button>
+<p id="signature"></p>
+
+<script>
+async function sign() {
+    if (!window.ethereum) return alert("MetaMask not detected");
+    const [account] = await ethereum.request({ method: "eth_requestAccounts" });
+    const msg = document.getElementById("msg").value;
+    if (!msg) return alert("Paste the challenge message from Discord");
+    try {
+        const sig = await ethereum.request({
+            method: "personal_sign",
+            params: [msg, account]
+        });
+        document.getElementById("signature").innerText = sig;
+    } catch(e) {
+        alert(e.message);
+    }
+}
+
+// Auto-fill from URL parameter
+const urlParams = new URLSearchParams(window.location.search);
+document.getElementById("msg").value = urlParams.get("msg") || "";
+</script>
+</body>
+</html>
