@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, GatewayIntentBits, ChannelType, PermissionFlagsBits } = require("discord.js");
 const express = require("express");
 const { ethers } = require("ethers");
 const path = require("path");
@@ -38,7 +38,7 @@ const provider = new ethers.JsonRpcProvider(RPC_URL);
 const ABI = ["function balanceOf(address owner) view returns (uint256)"];
 
 // ===== Bot Ready =====
-client.once("ready", () => console.log(`Logged in as ${client.user.tag}`));
+client.once("clientReady", () => console.log(`Logged in as ${client.user.tag}`));
 
 // ===== Message Handler =====
 client.on("messageCreate", async (message) => {
@@ -53,19 +53,28 @@ client.on("messageCreate", async (message) => {
       // Create temporary private channel for user
       const channel = await message.guild.channels.create({
         name: `verify-${message.author.username}`,
-        type: 0, // GUILD_TEXT
+        type: ChannelType.GuildText,
         permissionOverwrites: [
           {
             id: message.guild.id, // @everyone
-            deny: ['ViewChannel'], // hide from everyone
+            deny: [PermissionFlagsBits.ViewChannel], // hide from everyone
           },
           {
             id: message.author.id, // the user
-            allow: ['ViewChannel', 'SendMessages'],
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.ReadMessageHistory
+            ],
           },
           {
             id: client.user.id, // bot
-            allow: ['ViewChannel', 'SendMessages', 'ManageMessages'],
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.ManageMessages,
+              PermissionFlagsBits.ReadMessageHistory
+            ],
           },
         ],
       });
@@ -78,7 +87,7 @@ client.on("messageCreate", async (message) => {
         `Then reply with:\n!signature <your_signature>`
       );
 
-      // Optional: auto-delete channel if user never responds
+      // Auto-delete channel if user never responds
       setTimeout(async () => {
         if (challenges.has(message.author.id)) {
           challenges.delete(message.author.id);
