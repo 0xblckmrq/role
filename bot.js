@@ -49,12 +49,48 @@ client.on("messageCreate", async (message) => {
     const challenge = `Verify Discord ${message.author.id}-${Date.now()}`;
     challenges.set(message.author.id, challenge);
 
-    return message.reply(
-      `✅ **Wallet Verification Started**\n\n` +
-      `Sign this message with your wallet:\n\`${challenge}\`\n\n` +
-      `Or use the signer page: https://role-tfws.onrender.com/signer.html?msg=${encodeURIComponent(challenge)}\n\n` +
-      `Then reply with:\n!signature <your_signature>`
-    );
+    try {
+      // Create temporary private channel for user
+      const channel = await message.guild.channels.create({
+        name: `verify-${message.author.username}`,
+        type: 0, // GUILD_TEXT
+        permissionOverwrites: [
+          {
+            id: message.guild.id, // @everyone
+            deny: ['ViewChannel'], // hide from everyone
+          },
+          {
+            id: message.author.id, // the user
+            allow: ['ViewChannel', 'SendMessages'],
+          },
+          {
+            id: client.user.id, // bot
+            allow: ['ViewChannel', 'SendMessages', 'ManageMessages'],
+          },
+        ],
+      });
+
+      // Send challenge and signer page link in the temp channel
+      await channel.send(
+        `✅ **Wallet Verification Started**\n\n` +
+        `Sign this message with your wallet:\n\`${challenge}\`\n\n` +
+        `Or use the signer page: https://role-tfws.onrender.com/signer.html?msg=${encodeURIComponent(challenge)}\n\n` +
+        `Then reply with:\n!signature <your_signature>`
+      );
+
+      // Optional: auto-delete channel if user never responds
+      setTimeout(async () => {
+        if (challenges.has(message.author.id)) {
+          challenges.delete(message.author.id);
+          if (channel) channel.delete().catch(() => {});
+        }
+      }, 10 * 60 * 1000); // 10 minutes
+    } catch (err) {
+      console.error("Error creating verification channel:", err);
+      message.reply("❌ Failed to create verification channel. Please contact an admin.");
+    }
+
+    return;
   }
 
   // ---- Step 2: Signature submission ----
@@ -64,7 +100,7 @@ client.on("messageCreate", async (message) => {
 
     const signature = args[1];
     const challenge = challenges.get(message.author.id);
-    if (!challenge) return message.reply("Run !verify first.");
+    if (!challenge) return message.reply("Run !verify first or your challenge expired.");
 
     let wallet;
     try {
@@ -86,7 +122,13 @@ client.on("messageCreate", async (message) => {
       const member = await message.guild.members.fetch(message.author.id);
       await member.roles.add(role);
 
+      // Delete challenge
       challenges.delete(message.author.id);
+
+      // Delete the temporary verification channel if inside one
+      if (message.channel.name.startsWith("verify-")) {
+        await message.channel.delete();
+      }
 
       return message.reply(`✅ Verified! Wallet: ${wallet}`);
     } catch (err) {
